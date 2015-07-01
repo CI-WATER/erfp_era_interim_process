@@ -198,8 +198,9 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
     era_interim_folder = os.path.join(era_interim_data_location, 'erai_runoff_1980to2014')
     if download_era_interim:
         #download historical ERA data
-        era_interim_folder = ftp_ecmwf_download.download_all_ftp(era_interim_data_location,
-           'erai_runoff_1980to20*.tar.gz.tar')[0]
+        era_interim_folders = ftp_ecmwf_download.download_all_ftp(era_interim_data_location,
+           'erai_runoff_1980to20*.tar.gz.tar')
+        era_interim_folder = era_interim_folders[0]
 
     if upload_output_to_ckan and data_store_url and data_store_api_key:
         #init data manager for CKAN
@@ -207,122 +208,120 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
                                                 data_store_api_key)
 
     #run ERA Interim processes
-    for directory in rapid_input_directories:
-        #submit jobs to downsize ecmwf files to watershed
-        iteration = 0
-        job_list = []
-        job_info_list = []
-        for rapid_input_directory in rapid_input_directories:
-            input_folder_split = rapid_input_directory.split("-")
-            watershed = input_folder_split[0]
-            subbasin = input_folder_split[1]
-            master_watershed_input_directory = os.path.join(rapid_io_files_location, "input", rapid_input_directory)
-            master_watershed_outflow_directory = os.path.join(rapid_io_files_location, 'output',
-                                                              rapid_input_directory)
+    iteration = 0
+    job_list = []
+    job_info_list = []
+    for rapid_input_directory in rapid_input_directories:
+        input_folder_split = rapid_input_directory.split("-")
+        watershed = input_folder_split[0]
+        subbasin = input_folder_split[1]
+        master_watershed_input_directory = os.path.join(rapid_io_files_location, "input", rapid_input_directory)
+        master_watershed_outflow_directory = os.path.join(rapid_io_files_location, 'output',
+                                                          rapid_input_directory)
+        try:
+            os.makedirs(master_watershed_outflow_directory)
+        except OSError:
+            pass
+        #get basin names
+        interim_folder_basename = os.path.basename(era_interim_folder)
+        outflow_file_name = 'Qout_%s.nc' % interim_folder_basename
+        node_rapid_outflow_file = outflow_file_name
+        master_rapid_outflow_file = os.path.join(master_watershed_outflow_directory, outflow_file_name)
+
+        #create job to downscale forecasts for watershed
+        job = CJob('job_%s_%s_%s' % (interim_folder_basename, watershed, iteration), tmplt.vanilla_transfer_files)
+        job.set('executable',os.path.join(rapid_scripts_location,'compute_ecmwf_rapid.py'))
+        job.set('transfer_input_files', "%s, %s" % (master_watershed_input_directory, rapid_scripts_location))
+        job.set('initialdir', condor_init_dir)
+        job.set('arguments', '%s %s %s %s %s %s' % (watershed.lower(), subbasin.lower(), rapid_executable_location,
+                                                    era_interim_folder, ecmwf_forecast_location))
+        job.set('transfer_output_remaps', "\"%s = %s\"" % (node_rapid_outflow_file, master_rapid_outflow_file))
+        job.submit()
+        job_list.append(job)
+        job_info_list.append({'watershed' : watershed,
+                              'subbasin' : subbasin,
+                              'outflow_file_name' : master_rapid_outflow_file,
+                              'master_watershed_outflow_directory': master_watershed_outflow_directory,
+                              })
+        iteration += 1
+
+    #wait for jobs to finish then upload files
+    for index, job in enumerate(job_list):
+        job.wait()
+        """
+        #upload file when done
+        if upload_output_to_ckan and data_store_url and data_store_api_key:
+            job_info = job_info_list[index]
+            print "Uploading", job_info['watershed'], job_info['subbasin'], \
+                job_info['forecast_date_timestep'], job_info['ensemble_number']
+            #Upload to CKAN
+            data_manager.initialize_run_ecmwf(job_info['watershed'], job_info['subbasin'], job_info['forecast_date_timestep'])
+            data_manager.update_resource_ensemble_number(job_info['ensemble_number'])
+            #upload file
             try:
-                os.makedirs(master_watershed_outflow_directory)
-            except OSError:
-                pass
-            #get basin names
-            interim_folder_basename = os.path.basename(era_interim_folder)
-            outflow_file_name = 'Qout_%s.nc' % interim_folder_basename
-            node_rapid_outflow_file = outflow_file_name
-            master_rapid_outflow_file = os.path.join(master_watershed_outflow_directory, outflow_file_name)
-
-            #create job to downscale forecasts for watershed
-            job = CJob('job_%s_%s_%s' % (interim_folder_basename, watershed, iteration), tmplt.vanilla_transfer_files)
-            job.set('executable',os.path.join(rapid_scripts_location,'compute_ecmwf_rapid.py'))
-            job.set('transfer_input_files', "%s, %s" % (master_watershed_input_directory, rapid_scripts_location))
-            job.set('initialdir', condor_init_dir)
-            job.set('arguments', '%s %s %s %s %s %s' % (watershed.lower(), subbasin.lower(), rapid_executable_location,
-                                                       era_interim_folder, ecmwf_forecast_location))
-            job.set('transfer_output_remaps', "\"%s = %s\"" % (node_rapid_outflow_file, master_rapid_outflow_file))
-            job.submit()
-            job_list.append(job)
-            job_info_list.append({'watershed' : watershed,
-                                  'subbasin' : subbasin,
-                                  'outflow_file_name' : master_rapid_outflow_file,
-                                  'master_watershed_outflow_directory': master_watershed_outflow_directory,
-                                  })
-            iteration += 1
-
-        #wait for jobs to finish then upload files
-        for index, job in enumerate(job_list):
-            job.wait()
-            """
-            #upload file when done
-            if upload_output_to_ckan and data_store_url and data_store_api_key:
-                job_info = job_info_list[index]
-                print "Uploading", job_info['watershed'], job_info['subbasin'], \
-                    job_info['forecast_date_timestep'], job_info['ensemble_number']
-                #Upload to CKAN
-                data_manager.initialize_run_ecmwf(job_info['watershed'], job_info['subbasin'], job_info['forecast_date_timestep'])
-                data_manager.update_resource_ensemble_number(job_info['ensemble_number'])
-                #upload file
-                try:
-                    #tar.gz file
-                    output_tar_file =  os.path.join(job_info['master_watershed_outflow_directory'], "%s.tar.gz" % data_manager.resource_name)
-                    if not os.path.exists(output_tar_file):
-                        with tarfile.open(output_tar_file, "w:gz") as tar:
-                            tar.add(job_info['outflow_file_name'], arcname=os.path.basename(job_info['outflow_file_name']))
+                #tar.gz file
+                output_tar_file =  os.path.join(job_info['master_watershed_outflow_directory'], "%s.tar.gz" % data_manager.resource_name)
+                if not os.path.exists(output_tar_file):
+                    with tarfile.open(output_tar_file, "w:gz") as tar:
+                        tar.add(job_info['outflow_file_name'], arcname=os.path.basename(job_info['outflow_file_name']))
+                return_data = data_manager.upload_resource(output_tar_file)
+                if not return_data['success']:
+                    print return_data
+                    print "Attempting to upload again"
                     return_data = data_manager.upload_resource(output_tar_file)
                     if not return_data['success']:
                         print return_data
-                        print "Attempting to upload again"
-                        return_data = data_manager.upload_resource(output_tar_file)
-                        if not return_data['success']:
-                            print return_data
-                        else:
-                            print "Upload success"
                     else:
                         print "Upload success"
-                except Exception, e:
-                    print e
-                    pass
-                #remove tar.gz file
-                os.remove(output_tar_file)
+                else:
+                    print "Upload success"
+            except Exception, e:
+                print e
+                pass
+            #remove tar.gz file
+            os.remove(output_tar_file)
 
-        #initialize flows for next run
-        if initialize_flows:
-            #create new init flow files
-            for rapid_input_directory in rapid_input_directories:
-                input_directory = os.path.join(rapid_io_files_location, 'input', rapid_input_directory)
-                path_to_watershed_files = os.path.join(rapid_io_files_location, 'output', rapid_input_directory)
-                forecast_date_timestep = None
-                #finds the current output from downscaled ECMWF forecasts
-                if os.path.exists(path_to_watershed_files):
-                    forecast_date_timestep = sorted([d for d in os.listdir(path_to_watershed_files) \
-                                            if os.path.isdir(os.path.join(path_to_watershed_files, d))],
-                                            reverse=True)[0]
+    #initialize flows for next run
+    if initialize_flows:
+        #create new init flow files
+        for rapid_input_directory in rapid_input_directories:
+            input_directory = os.path.join(rapid_io_files_location, 'input', rapid_input_directory)
+            path_to_watershed_files = os.path.join(rapid_io_files_location, 'output', rapid_input_directory)
+            forecast_date_timestep = None
+            #finds the current output from downscaled ECMWF forecasts
+            if os.path.exists(path_to_watershed_files):
+                forecast_date_timestep = sorted([d for d in os.listdir(path_to_watershed_files) \
+                                        if os.path.isdir(os.path.join(path_to_watershed_files, d))],
+                                        reverse=True)[0]
 
-                if forecast_date_timestep:
-                    #loop through all the rapid_namelist files in directory
-                    forecast_directory = os.path.join(path_to_watershed_files, forecast_date_timestep)
-                    input_folder_split = rapid_input_directory.split("-")
-                    watershed = input_folder_split[0]
-                    subbasin = input_folder_split[1]
-                    if initialize_flows:
-                        print "Initializing flows for", watershed, subbasin, "from", forecast_date_timestep
-                        basin_files = find_current_rapid_output(forecast_directory, watershed, subbasin)
-                        try:
-                            compute_initial_rapid_flows(basin_files, input_directory, forecast_date_timestep)
-                        except Exception, ex:
-                            print ex
-                            pass
-        if upload_output_to_ckan and data_store_url and data_store_api_key:
-            #delete local datasets
-            for job_info in job_info_list:
-                try:
-                    rmtree(job_info['master_watershed_outflow_directory'])
-                except OSError:
-                    pass
-            #delete watershed folder if empty
-            for item in os.listdir(os.path.join(rapid_io_files_location, 'output')):
-                try:
-                    os.rmdir(os.path.join(rapid_io_files_location, 'output', item))
-                except OSError:
-                    pass
-        """
+            if forecast_date_timestep:
+                #loop through all the rapid_namelist files in directory
+                forecast_directory = os.path.join(path_to_watershed_files, forecast_date_timestep)
+                input_folder_split = rapid_input_directory.split("-")
+                watershed = input_folder_split[0]
+                subbasin = input_folder_split[1]
+                if initialize_flows:
+                    print "Initializing flows for", watershed, subbasin, "from", forecast_date_timestep
+                    basin_files = find_current_rapid_output(forecast_directory, watershed, subbasin)
+                    try:
+                        compute_initial_rapid_flows(basin_files, input_directory, forecast_date_timestep)
+                    except Exception, ex:
+                        print ex
+                        pass
+    if upload_output_to_ckan and data_store_url and data_store_api_key:
+        #delete local datasets
+        for job_info in job_info_list:
+            try:
+                rmtree(job_info['master_watershed_outflow_directory'])
+            except OSError:
+                pass
+        #delete watershed folder if empty
+        for item in os.listdir(os.path.join(rapid_io_files_location, 'output')):
+            try:
+                os.rmdir(os.path.join(rapid_io_files_location, 'output', item))
+            except OSError:
+                pass
+    """
 
     #print info to user
     time_end = datetime.datetime.utcnow()
