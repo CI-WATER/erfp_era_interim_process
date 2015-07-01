@@ -335,17 +335,17 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
     run_era_interim_rapid_process(
-        rapid_executable_location='/home/cecsr/work/rapid/src/rapid',
-        rapid_io_files_location='/home/cecsr/rapid',
-        ecmwf_forecast_location ="/home/cecsr/ecmwf",
-        era_interim_data_location="/home/cecsr/era_interim",
-        condor_log_directory='/home/cecsr/condor/',
-        main_log_directory='/home/cecsr/logs/',
+        rapid_executable_location='/home/nfieera/work/rapid/src/rapid',
+        rapid_io_files_location='/home/nfieera/rapid-io',
+        ecmwf_forecast_location ="/home/nfieera/ecmwf",
+        era_interim_data_location="/home/nfieera/era_data",
+        condor_log_directory='/home/nfieera/condor/',
+        main_log_directory='/home/nfieera/logs/',
         data_store_url='http://ciwckan.chpc.utah.edu',
         data_store_api_key='8dcc1b34-0e09-4ddc-8356-df4a24e5be87',
         app_instance_id='53ab91374b7155b0a64f0efcd706854e',
         sync_rapid_input_with_ckan=False,
-        download_era_interim=True,
-        download_ecmwf=True,
-        upload_output_to_ckan=True,
+        download_era_interim=False,
+        download_ecmwf=False,
+        upload_output_to_ckan=False,
     )
