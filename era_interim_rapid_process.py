@@ -233,7 +233,7 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
         job.set('executable',os.path.join(rapid_scripts_location,'compute_ecmwf_rapid.py'))
         job.set('transfer_input_files', "%s, %s" % (master_watershed_input_directory, rapid_scripts_location))
         job.set('initialdir', condor_init_dir)
-        job.set('arguments', '%s %s %s %s %s %s' % (watershed.lower(), subbasin.lower(), rapid_executable_location,
+        job.set('arguments', '%s %s %s %s %s' % (watershed.lower(), subbasin.lower(), rapid_executable_location,
                                                     era_interim_folder, ecmwf_forecast_location))
         job.set('transfer_output_remaps', "\"%s = %s\"" % (node_rapid_outflow_file, master_rapid_outflow_file))
         job.submit()
