@@ -458,16 +458,14 @@ def convert_ecmwf_rapid_output_to_cf_compliant(start_date,
                 rapid_nc.close()
 
                 cf_nc.close()
-                """
                 #delete original RAPID output
                 try:
                     os.remove(rapid_nc_filename)
                 except OSError:
                     pass
 
-                #replace original with nc compliant file
-                shutil.move(cf_nc_filename, rapid_nc_filename)
-                """
+                #rename nc compliant file to original name
+                os.rename(cf_nc_filename, rapid_nc_filename)
                 log('Time to process %s' % (datetime.utcnow()-time_start_conversion), 'INFO')
             except Exception, e:
                 #delete cf RAPID output

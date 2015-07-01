@@ -157,6 +157,8 @@ def download_all_ftp(download_dir, file_match):
         #get correct local_dir
         if local_path.endswith('.tar.gz'):
             local_dir = local_path[:-7]
+        elif local_path.endswith('.tar.gz.tar'):
+            local_dir = local_path[:-11]
         else:
             local_dir = download_dir
         #download and unzip file

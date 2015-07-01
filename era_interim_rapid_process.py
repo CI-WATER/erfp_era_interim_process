@@ -14,7 +14,6 @@ import tarfile
 
 #local imports
 import ftp_ecmwf_download
-from generate_warning_points import generate_warning_points
 from sfpt_dataset_manager.dataset_manager import (ECMWFRAPIDDatasetManager,
                                                   RAPIDInputDatasetManager)
 
@@ -149,10 +148,10 @@ def compute_initial_rapid_flows(prediction_files, input_directory, forecast_date
     else:
         print "No current forecasts found. Skipping ..."
 
-def run_ecmwf_rapid_process(rapid_executable_location, rapid_io_files_location, ecmwf_forecast_location,
-                            era_interim_data_location, condor_log_directory, main_log_directory, data_store_url,
-                            data_store_api_key, app_instance_id, sync_rapid_input_with_ckan, download_ecmwf,
-                            upload_output_to_ckan, initialize_flows, create_warning_points):
+def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_location, ecmwf_forecast_location,
+                                  era_interim_data_location, condor_log_directory, main_log_directory, data_store_url,
+                                  data_store_api_key, app_instance_id, sync_rapid_input_with_ckan, download_ecmwf,
+                                  download_era_interim, upload_output_to_ckan):
     """
     This it the main process
     """
@@ -196,57 +195,53 @@ def run_ecmwf_rapid_process(rapid_executable_location, rapid_io_files_location, 
         ecmwf_folders = glob(os.path.join(ecmwf_forecast_location,
             'Runoff.'+date_string+'*.netcdf'))
 
+    era_interim_folder = os.path.join(era_interim_data_location, 'erai_runoff_1980to2014')
+    if download_era_interim:
+        #download historical ERA data
+        era_interim_folder = ftp_ecmwf_download.download_all_ftp(era_interim_data_location,
+           'erai_runoff_1980to20*.tar.gz.tar')[0]
+
     if upload_output_to_ckan and data_store_url and data_store_api_key:
         #init data manager for CKAN
         data_manager = ECMWFRAPIDDatasetManager(data_store_url,
                                                 data_store_api_key)
 
-    #prepare ECMWF files
-    for ecmwf_folder in ecmwf_folders:
-        ecmwf_forecasts = glob(os.path.join(ecmwf_folder,'*.runoff.netcdf'))
-        #make the largest files first
-        ecmwf_forecasts.sort(key=os.path.getsize, reverse=True)
-
+    #run ERA Interim processes
+    for directory in rapid_input_directories:
         #submit jobs to downsize ecmwf files to watershed
         iteration = 0
         job_list = []
         job_info_list = []
-        for forecast_combo in itertools.product(ecmwf_forecasts, rapid_input_directories):
-            forecast = forecast_combo[0]
-            input_folder = forecast_combo[1]
-            input_folder_split = input_folder.split("-")
+        for rapid_input_directory in rapid_input_directories:
+            input_folder_split = rapid_input_directory.split("-")
             watershed = input_folder_split[0]
             subbasin = input_folder_split[1]
-            forecast_split = os.path.basename(forecast).split(".")
-            forecast_date_timestep = ".".join(forecast_split[:2])
-            ensemble_number = int(forecast_split[2])
-            master_watershed_input_directory = os.path.join(rapid_io_files_location, "input", input_folder)
+            master_watershed_input_directory = os.path.join(rapid_io_files_location, "input", rapid_input_directory)
             master_watershed_outflow_directory = os.path.join(rapid_io_files_location, 'output',
-                                                              input_folder, forecast_date_timestep)
+                                                              rapid_input_directory)
             try:
                 os.makedirs(master_watershed_outflow_directory)
             except OSError:
                 pass
             #get basin names
-            outflow_file_name = 'Qout_%s_%s_%s.nc' % (watershed.lower(), subbasin.lower(), ensemble_number)
+            interim_folder_basename = os.path.basename(era_interim_folder)
+            outflow_file_name = 'Qout_%s.nc' % interim_folder_basename
             node_rapid_outflow_file = outflow_file_name
             master_rapid_outflow_file = os.path.join(master_watershed_outflow_directory, outflow_file_name)
 
             #create job to downscale forecasts for watershed
-            job = CJob('job_%s_%s_%s' % (forecast_date_timestep, watershed, iteration), tmplt.vanilla_transfer_files)
+            job = CJob('job_%s_%s_%s' % (interim_folder_basename, watershed, iteration), tmplt.vanilla_transfer_files)
             job.set('executable',os.path.join(rapid_scripts_location,'compute_ecmwf_rapid.py'))
-            job.set('transfer_input_files', "%s, %s, %s" % (forecast, master_watershed_input_directory, rapid_scripts_location))
-            job.set('initialdir',condor_init_dir)
-            job.set('arguments', '%s %s %s %s %s' % (forecast, watershed.lower(), subbasin.lower(),
-                                                        rapid_executable_location, initialize_flows))
-            job.set('transfer_output_remaps',"\"%s = %s\"" % (node_rapid_outflow_file, master_rapid_outflow_file))
+            job.set('transfer_input_files', "%s, %s" % (master_watershed_input_directory, rapid_scripts_location))
+            job.set('initialdir', condor_init_dir)
+            job.set('arguments', '%s %s %s %s %s %s' % (watershed.lower(), subbasin.lower(), rapid_executable_location,
+                                                       era_interim_folder, ecmwf_forecast_location))
+            job.set('transfer_output_remaps', "\"%s = %s\"" % (node_rapid_outflow_file, master_rapid_outflow_file))
             job.submit()
             job_list.append(job)
             job_info_list.append({'watershed' : watershed,
                                   'subbasin' : subbasin,
                                   'outflow_file_name' : master_rapid_outflow_file,
-                                  'forecast_date_timestep' : forecast_date_timestep,
-                                  'ensemble_number': ensemble_number,
                                   'master_watershed_outflow_directory': master_watershed_outflow_directory,
                                   })
             iteration += 1
@@ -254,6 +249,7 @@ def run_ecmwf_rapid_process(rapid_executable_location, rapid_io_files_location, 
         #wait for jobs to finish then upload files
         for index, job in enumerate(job_list):
             job.wait()
+            """
             #upload file when done
             if upload_output_to_ckan and data_store_url and data_store_api_key:
                 job_info = job_info_list[index]
@@ -287,8 +283,8 @@ def run_ecmwf_rapid_process(rapid_executable_location, rapid_io_files_location, 
                 os.remove(output_tar_file)
 
         #initialize flows for next run
-        if initialize_flows or create_warning_points:
-            #create new init flow files/generate warning point files
+        if initialize_flows:
+            #create new init flow files
             for rapid_input_directory in rapid_input_directories:
                 input_directory = os.path.join(rapid_io_files_location, 'input', rapid_input_directory)
                 path_to_watershed_files = os.path.join(rapid_io_files_location, 'output', rapid_input_directory)
@@ -313,26 +309,6 @@ def run_ecmwf_rapid_process(rapid_executable_location, rapid_io_files_location, 
                         except Exception, ex:
                             print ex
                             pass
-
-                    era_interim_watershed_directory = os.path.join(era_interim_data_location, rapid_input_directory)
-                    if create_warning_points and os.path.exists(era_interim_watershed_directory):
-                        print "Generating Warning Points for", watershed, subbasin, "from", forecast_date_timestep
-                        era_interim_files = glob(os.path.join(era_interim_watershed_directory, "*.nc"))
-                        if era_interim_files:
-                            try:
-                                generate_warning_points(forecast_directory, era_interim_files[0], forecast_directory)
-                                if upload_output_to_ckan and data_store_url and data_store_api_key:
-                                    data_manager.initialize_run_ecmwf(watershed, subbasin, forecast_date_timestep)
-                                    data_manager.zip_upload_warning_points_in_directory(forecast_directory)
-                            except Exception, ex:
-                                print ex
-                                pass
-                        else:
-                            print "No ERA Interim file found. Skipping ..."
-                    else:
-                        print "No ERA Interim directory found for", rapid_input_directory, ". Skipping warning point generation..."
-
-
         if upload_output_to_ckan and data_store_url and data_store_api_key:
             #delete local datasets
             for job_info in job_info_list:
@@ -346,6 +322,7 @@ def run_ecmwf_rapid_process(rapid_executable_location, rapid_io_files_location, 
                     os.rmdir(os.path.join(rapid_io_files_location, 'output', item))
                 except OSError:
                     pass
+        """
 
     #print info to user
     time_end = datetime.datetime.utcnow()
@@ -357,7 +334,7 @@ def run_ecmwf_rapid_process(rapid_executable_location, rapid_io_files_location, 
 #main process
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
-    run_ecmwf_rapid_process(
+    run_era_interim_rapid_process(
         rapid_executable_location='/home/cecsr/work/rapid/src/rapid',
         rapid_io_files_location='/home/cecsr/rapid',
         ecmwf_forecast_location ="/home/cecsr/ecmwf",
@@ -368,8 +345,7 @@ if __name__ == "__main__":
         data_store_api_key='8dcc1b34-0e09-4ddc-8356-df4a24e5be87',
         app_instance_id='53ab91374b7155b0a64f0efcd706854e',
         sync_rapid_input_with_ckan=False,
+        download_era_interim=True,
         download_ecmwf=True,
         upload_output_to_ckan=True,
-        initialize_flows=True,
-        create_warning_points=True,
     )

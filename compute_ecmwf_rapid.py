@@ -6,8 +6,9 @@ import re
 from subprocess import Popen
 import sys
 
-from erfp_data_process_ubuntu_aws.CreateInflowFileFromECMWFRunoff import CreateInflowFileFromECMWFRunoff
-from erfp_data_process_ubuntu_aws.make_CF_RAPID_output import convert_ecmwf_rapid_output_to_cf_compliant
+from erfp_era_interim_process.CreateInflowFileFromERAInterimRunoff import CreateInflowFileFromERAInterimRunoff
+from erfp_era_interim_process.CreateInflowFileFromHighResECMWFRunoff import CreateInflowFileFromHighResECMWFRunoff
+from erfp_era_interim_process.make_CF_RAPID_output import convert_ecmwf_rapid_output_to_cf_compliant
 #------------------------------------------------------------------------------
 #functions
 #------------------------------------------------------------------------------
@@ -34,8 +35,7 @@ def csv_to_list(csv_file, delimiter=','):
         reader = csv.reader(csv_con, delimiter=delimiter)
         return list(reader)
 
-def generate_namelist_file(rapid_io_files_location, watershed, subbasin,
-                           ensemble_number, forecast_date_timestep, init_flow = False):
+def generate_namelist_file(rapid_io_files_location, watershed, subbasin, duration, interval, era_interim_folder_basename):
     """
     Generate RAPID namelist file with new input
     """
@@ -55,27 +55,18 @@ def generate_namelist_file(rapid_io_files_location, watershed, subbasin,
     riv_bas_id_table = csv_to_list(riv_bas_id_file)
     is_riv_bas = len(riv_bas_id_table)
 
-
-    #default duration of 15 days
-    duration = 15*24*60*60
-    #default interval of 6 hrs
-    interval = 6*60*60
-    #if it is high res
-    if(int(ensemble_number) == 52):
-        #duration of 10 days
-        duration = 10*24*60*60
-        #interval of 3 hrs
-        #interval = 3*60*60
-
     qinit_file = None
-    if(init_flow):
-        #check for qinit file
-        past_date = (datetime.datetime.strptime(forecast_date_timestep[:11],"%Y%m%d.%H") - \
-                     datetime.timedelta(hours=12)).strftime("%Y%m%dt%H")
-        qinit_file = os.path.join(rapid_input_directory, 'Qinit_%s.csv' % past_date)
-        init_flow = qinit_file and os.path.exists(qinit_file)
-        if not init_flow:
-            print "Error:", qinit_file, "not found. Not initializing ..."
+    init_flow = False
+    #TODO: add timestamp for init flow file
+    """
+    #check for qinit file
+    past_date = (datetime.datetime.strptime(forecast_date_timestep[:11],"%Y%m%d.%H") - \
+                 datetime.timedelta(hours=12)).strftime("%Y%m%dt%H")
+    qinit_file = os.path.join(rapid_input_directory, 'Qinit_%s.csv' % past_date)
+    init_flow = qinit_file and os.path.exists(qinit_file)
+    if not init_flow:
+        print "Error:", qinit_file, "not found. Not initializing ..."
+    """
 
     old_file = open(template_namelist_file)
     new_file = open(watershed_namelist_file,'w')
@@ -99,7 +90,7 @@ def generate_namelist_file(rapid_io_files_location, watershed, subbasin,
             new_file.write('IS_max_up          =%s\n' % is_max_up)
         elif line.strip().startswith('Vlat_file'):
             new_file.write('Vlat_file          =\'%s\'\n' % os.path.join(rapid_io_files_location,
-                                                                         'm3_riv_bas_%s.nc' % ensemble_number))
+                                                                         'm3_riv_bas_%s.nc' % era_interim_folder_basename))
         elif line.strip().startswith('IS_riv_bas'):
             new_file.write('IS_riv_bas          =%s\n' % is_riv_bas)
         elif line.strip().startswith('riv_bas_id_file'):
@@ -117,9 +108,7 @@ def generate_namelist_file(rapid_io_files_location, watershed, subbasin,
                                                                                          r'x\.csv'))
         elif line.strip().startswith('Qout_file'):
             new_file.write('Qout_file          =\'%s\'\n' % os.path.join(rapid_io_files_location,
-                                                                         'Qout_%s_%s_%s.nc' % (watershed.lower(),
-                                                                                               subbasin.lower(),
-                                                                                               ensemble_number)))
+                                                                         'Qout_%s.nc' % era_interim_folder_basename))
         else:
             new_file.write(line)
 
@@ -127,14 +116,11 @@ def generate_namelist_file(rapid_io_files_location, watershed, subbasin,
     new_file.close()
     old_file.close()
 
-def run_RAPID_single_watershed(forecast, watershed, subbasin,
-                               rapid_executable_location, node_path, init_flow):
+def run_RAPID_single_watershed(watershed, subbasin, rapid_executable_location,
+                               node_path, duration, interval, era_interim_folder_basename):
     """
     run RAPID on single watershed after ECMWF prepared
     """
-    forecast_split = os.path.basename(forecast).split(".")
-    ensemble_number = int(forecast_split[2])
-    forecast_date_timestep = ".".join(forecast_split[:2])
     rapid_namelist_file = os.path.join(node_path,'rapid_namelist')
     local_rapid_executable = os.path.join(node_path,'rapid')
 
@@ -144,9 +130,8 @@ def run_RAPID_single_watershed(forecast, watershed, subbasin,
     time_start_rapid = datetime.datetime.utcnow()
 
     #change the new RAPID namelist file
-    print "Updating namelist file for:", watershed, subbasin, ensemble_number
-    generate_namelist_file(node_path, watershed, subbasin, ensemble_number,
-                           forecast_date_timestep, init_flow)
+    print "Updating namelist file for:", watershed, subbasin
+    generate_namelist_file(node_path, watershed, subbasin, duration, interval, era_interim_folder_basename)
 
     def rapid_cleanup(local_rapid_executable, rapid_namelist_file):
         """
@@ -167,7 +152,7 @@ def run_RAPID_single_watershed(forecast, watershed, subbasin,
 
 
     #run RAPID
-    print "Running RAPID for:", subbasin, "Ensemble:", ensemble_number
+    print "Running RAPID for:", subbasin
     try:
         process = Popen([local_rapid_executable], shell=True)
         process.communicate()
@@ -180,34 +165,30 @@ def run_RAPID_single_watershed(forecast, watershed, subbasin,
     rapid_cleanup(local_rapid_executable, rapid_namelist_file)
 
     #convert rapid output to be CF compliant
-    convert_ecmwf_rapid_output_to_cf_compliant(datetime.datetime.strptime(forecast_date_timestep[:11], "%Y%m%d.%H"),
-                                               node_path)
+    #TODO: get start date
+    convert_ecmwf_rapid_output_to_cf_compliant(start_date=datetime(1980,1,1),
+                                               start_folder=node_path,
+                                               time_step=interval,
+                                               )
 
-def process_upload_ECMWF_RAPID(ecmwf_forecast, watershed, subbasin,
-                               rapid_executable_location, init_flow):
+def process_upload_ECMWF_RAPID(watershed, subbasin, rapid_executable_location,
+                               era_interim_folder, ecmwf_forecast_location):
     """
     prepare all ECMWF files for rapid
     """
     node_path = os.path.dirname(os.path.realpath(__file__))
-    forecast_basename = os.path.basename(ecmwf_forecast)
-    forecast_split = forecast_basename.split(".")
-    forecast_date_timestep = ".".join(forecast_split[:2])
-    ensemble_number = int(forecast_split[2])
     old_rapid_input_directory = os.path.join(node_path, "%s-%s" % (watershed, subbasin))
     rapid_input_directory = os.path.join(node_path, "rapid_input")
 
     #rename rapid input directory
     os.rename(old_rapid_input_directory, rapid_input_directory)
 
-    inflow_file_name = 'm3_riv_bas_%s.nc' % ensemble_number
+    era_interim_folder_basename = os.path.basename(os.path.basename(era_interim_folder))
 
-    #determine weight table from resolution
-    if ensemble_number == 52:
-        weight_table_file = case_insensitive_file_search(rapid_input_directory,
-                                                         r'weight_high_res.csv')
-    else:
-        weight_table_file = case_insensitive_file_search(rapid_input_directory,
-                                                         r'weight_low_res.csv')
+    inflow_file_name = 'm3_riv_bas_%s.nc' % os.path.basename(era_interim_folder_basename)
+
+    #TODO: check if high res or era interim
+    ensemble_number = "era_interim"
 
     time_start_all = datetime.datetime.utcnow()
 
@@ -226,18 +207,47 @@ def process_upload_ECMWF_RAPID(ecmwf_forecast, watershed, subbasin,
     try:
         #prepare ECMWF file for RAPID
         print "Running all ECMWF downscaling for watershed:", watershed, subbasin, \
-            forecast_date_timestep, ensemble_number
+              ensemble_number
 
         print "Converting ECMWF inflow"
         #optional argument ... time interval?
-        RAPIDinflowECMWF_tool = CreateInflowFileFromECMWFRunoff()
-        RAPIDinflowECMWF_tool.execute(forecast_basename, weight_table_file, inflow_file_name)
+        #determine weight table from resolution
+        nc_files = []
+        if ensemble_number == 52:
+            weight_table_file = case_insensitive_file_search(rapid_input_directory,
+                                                             r'weight_high_res.csv')
+            RAPIDinflowECMWF_tool = CreateInflowFileFromHighResECMWFRunoff()
+            for subdir, dirs, files in os.walk(ecmwf_forecast_location):
+                for file in files:
+                    if file.endswith('.nc'):
+                        nc_files.append(os.path.join(subdir, file))
+            #each file is 12 hours
+            duration = len(nc_files)*12*3600
+            #hourly time step
+            interval = 3600
+        else:
+            weight_table_file = case_insensitive_file_search(rapid_input_directory,
+                                                             r'weight_era_interim.csv')
+            for subdir, dirs, files in os.walk(era_interim_folder):
+                for file in files:
+                    if file.endswith('.nc'):
+                        nc_files.append(os.path.join(subdir, file))
+            #each file is 24 hours
+            duration = len(nc_files)*24*3600
+            #daily time step
+            interval = 24*3600
+
+            RAPIDinflowECMWF_tool = CreateInflowFileFromERAInterimRunoff()
+
+        RAPIDinflowECMWF_tool.execute(in_sorted_nc_files=sorted(nc_files),
+                                     in_weight_table=weight_table_file,
+                                     out_nc=inflow_file_name)
 
         time_finish_ecmwf = datetime.datetime.utcnow()
         print "Time to convert ECMWF: %s" % (time_finish_ecmwf-time_start_all)
 
-        run_RAPID_single_watershed(forecast_basename, watershed, subbasin,
-                                   rapid_executable_location, node_path, init_flow)
+        run_RAPID_single_watershed(watershed, subbasin, rapid_executable_location, node_path,
+                                   duration, interval, era_interim_folder_basename)
     except Exception:
         remove_inflow_file(inflow_file_name)
         raise
