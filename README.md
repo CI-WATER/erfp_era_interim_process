@@ -36,6 +36,7 @@ echo WANT_VACATE = False >> /etc/condor/condor_config.local
 ```
 NOTE: if you forgot to change lines for master node, change CONDOR_HOST = $(IP_ADDRESS)
 and run $ . /etc/init.d/condor restart as ROOT
+
 ##Step 3: Install netCDF4-python
 ###Install on Ubuntu:
 ```
@@ -59,6 +60,7 @@ $ sudo su
 $ pip install requests_toolbelt tethys_dataset_services condorpy
 $ exit
 ```
+
 ##Step 5: Download the source code
 ```
 $ cd /path/to/your/scripts/
@@ -81,19 +83,20 @@ Go into *rapid_process_async_ubuntu.py* and change these variables for your inst
 #main process
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
-    run_ecmwf_rapid_process(
+    run_era_interim_rapid_process(
         rapid_executable_location='/home/cecsr/work/rapid/src/rapid',
         rapid_io_files_location='/home/cecsr/rapid',
         ecmwf_forecast_location ="/home/cecsr/ecmwf",
+        era_interim_data_location="/home/cecsr/era_interim",
         condor_log_directory='/home/cecsr/condor/',
         main_log_directory='/home/cecsr/logs/',
         data_store_url='http://ciwckan.chpc.utah.edu',
         data_store_api_key='8dcc1b34-0e09-4ddc-8356-df4a24e5be87',
         app_instance_id='53ab91374b7155b0a64f0efcd706854e',
         sync_rapid_input_with_ckan=False,
+        download_era_interim=True,
         download_ecmwf=True,
         upload_output_to_ckan=True,
-        initialize_flows=True
     )
 ```
 Go into *rapid_process.sh* and change make sure the path locations and variables are correct for your instance.
@@ -111,8 +114,8 @@ Go into *ftp_ecmwf_download.py* and add password and login information:
 
 Example:
 ```
-$ chmod 554 rapid_process_async_ubuntu.py
-$ chmod 554 rapid_process.sh
+$ chmod 554 era_interim_rapid_process.py
+$ chmod 554 era_interim_rapid_process.sh
 ```
 ##Step 9: Add RAPID files to the work/rapid/input directory
 Make sure the directory is in the format [watershed name]-[subbasin name]
@@ -124,9 +127,11 @@ Example:
 $ ls /rapid/input
 nfie_texas_gulf_region-huc_2_12
 $ ls /rapid/input/nfie_texas_gulf_region-huc_2_12
+comid_lat_lon_z.csv
 k.csv
 rapid_connect.csv
 riv_bas_id.csv
+weight_era_interim.csv
 weight_high_res.csv
 weight_low_res.csv
 x.csv
@@ -142,7 +147,9 @@ $ ./rapid_process.sh
 
 1) Install crontab Python package.
 ```
+$ sudo su
 $ pip install python-crontab
+$ exit
 ```
 2) Modify location of script in *create_cron.py*
 ```python

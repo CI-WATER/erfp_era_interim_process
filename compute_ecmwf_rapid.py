@@ -41,7 +41,7 @@ def generate_namelist_file(rapid_io_files_location, watershed, subbasin, duratio
     """
     rapid_input_directory = os.path.join(rapid_io_files_location, "rapid_input")
     watershed_namelist_file = os.path.join(rapid_io_files_location, 'rapid_namelist')
-    template_namelist_file = case_insensitive_file_search(os.path.join(rapid_io_files_location, 'erfp_data_process_ubuntu_aws'),
+    template_namelist_file = case_insensitive_file_search(os.path.join(rapid_io_files_location, 'erfp_era_interim_process'),
                                                           'rapid_namelist_template\.dat')
 
     #get rapid connect info
