@@ -35,7 +35,7 @@ def csv_to_list(csv_file, delimiter=','):
         reader = csv.reader(csv_con, delimiter=delimiter)
         return list(reader)
 
-def generate_namelist_file(rapid_io_files_location, watershed, subbasin, duration, interval, era_interim_folder_basename):
+def generate_namelist_file(rapid_io_files_location, duration, interval, era_interim_folder_basename):
     """
     Generate RAPID namelist file with new input
     """
@@ -166,7 +166,7 @@ def run_RAPID_single_watershed(watershed, subbasin, rapid_executable_location,
 
     #convert rapid output to be CF compliant
     #TODO: get start date
-    convert_ecmwf_rapid_output_to_cf_compliant(start_date=datetime(1980,1,1),
+    convert_ecmwf_rapid_output_to_cf_compliant(start_date=datetime.datetime(1980,1,1),
                                                start_folder=node_path,
                                                time_step=interval,
                                                )
@@ -258,5 +258,5 @@ def process_upload_ECMWF_RAPID(watershed, subbasin, rapid_executable_location,
     time_stop_all = datetime.datetime.utcnow()
     print "Total time to compute: %s" % (time_stop_all-time_start_all)
 
-if __name__ == "__main__":   
+if __name__ == "__main__":
     process_upload_ECMWF_RAPID(sys.argv[1],sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
