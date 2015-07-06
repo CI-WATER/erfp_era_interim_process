@@ -131,7 +131,7 @@ def run_RAPID_single_watershed(watershed, subbasin, rapid_executable_location,
 
     #change the new RAPID namelist file
     print "Updating namelist file for:", watershed, subbasin
-    generate_namelist_file(node_path, watershed, subbasin, duration, interval, era_interim_folder_basename)
+    generate_namelist_file(node_path, duration, interval, era_interim_folder_basename)
 
     def rapid_cleanup(local_rapid_executable, rapid_namelist_file):
         """
