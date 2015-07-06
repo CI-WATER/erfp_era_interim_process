@@ -36,7 +36,7 @@ def clean_logs(condor_log_directory, main_log_directory):
     #clean up log files
     main_log_files = [f for f in os.listdir(main_log_directory) if not os.path.isdir(os.path.join(main_log_directory, f))]
     for main_log_file in main_log_files:
-        log_datetime = datetime.datetime.strptime(main_log_file, "rapid_%y%m%d%H%M%S.log")
+        log_datetime = datetime.datetime.strptime(main_log_file, "%y%m%d%H%M%S.log")
         if (date_today-log_datetime > week_timedelta):
             os.remove(os.path.join(main_log_directory, main_log_file))
 
@@ -200,6 +200,7 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
         #download historical ERA data
         era_interim_folders = ftp_ecmwf_download.download_all_ftp(era_interim_data_location,
            'erai_runoff_1980to20*.tar.gz.tar')
+        #TODO: extract all internal tar.gz files inside extracted folder
         era_interim_folder = era_interim_folders[0]
 
     if upload_output_to_ckan and data_store_url and data_store_api_key:
