@@ -6,9 +6,9 @@ import re
 from subprocess import Popen
 import sys
 
-from erfp_era_interim_process.lib.CreateInflowFileFromERAInterimRunoff import CreateInflowFileFromERAInterimRunoff
-from erfp_era_interim_process.lib.CreateInflowFileFromHighResECMWFRunoff import CreateInflowFileFromHighResECMWFRunoff
-from erfp_era_interim_process.lib.make_CF_RAPID_output import convert_ecmwf_rapid_output_to_cf_compliant
+from erfp_era_interim_process.imports.CreateInflowFileFromERAInterimRunoff import CreateInflowFileFromERAInterimRunoff
+from erfp_era_interim_process.imports.CreateInflowFileFromHighResECMWFRunoff import CreateInflowFileFromHighResECMWFRunoff
+from erfp_era_interim_process.imports.make_CF_RAPID_output import convert_ecmwf_rapid_output_to_cf_compliant
 #------------------------------------------------------------------------------
 #functions
 #------------------------------------------------------------------------------

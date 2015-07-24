@@ -10,7 +10,7 @@ import os
 from shutil import rmtree
 
 #local imports
-from lib.ftp_ecmwf_download import download_all_ftp
+from imports.ftp_ecmwf_download import download_all_ftp
 from sfpt_dataset_manager.dataset_manager import (ECMWFRAPIDDatasetManager,
                                                   RAPIDInputDatasetManager)
 
