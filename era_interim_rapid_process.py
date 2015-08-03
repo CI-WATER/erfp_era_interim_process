@@ -4,16 +4,13 @@ from condorpy import Templates as tmplt
 import csv
 import datetime
 from glob import glob
-import itertools
 import netCDF4 as NET
 import numpy as np
 import os
-import re
 from shutil import rmtree
-import tarfile
 
 #local imports
-import ftp_ecmwf_download
+from imports.ftp_ecmwf_download import download_all_ftp
 from sfpt_dataset_manager.dataset_manager import (ECMWFRAPIDDatasetManager,
                                                   RAPIDInputDatasetManager)
 from generate_return_periods import generate_return_periods
@@ -37,9 +34,13 @@ def clean_logs(condor_log_directory, main_log_directory):
     #clean up log files
     main_log_files = [f for f in os.listdir(main_log_directory) if not os.path.isdir(os.path.join(main_log_directory, f))]
     for main_log_file in main_log_files:
-        log_datetime = datetime.datetime.strptime(main_log_file, "%y%m%d%H%M%S.log")
-        if (date_today-log_datetime > week_timedelta):
-            os.remove(os.path.join(main_log_directory, main_log_file))
+        try:
+            log_datetime = datetime.datetime.strptime(main_log_file, "%y%m%d%H%M%S.log")
+            if (date_today-log_datetime > week_timedelta):
+                os.remove(os.path.join(main_log_directory, main_log_file))
+        except Exception as ex:
+            print ex
+            pass
 
 def find_current_rapid_output(forecast_directory, watershed, subbasin):
     """
@@ -188,20 +189,11 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
         else:
             print directory, "incorrectly formatted. Skipping ..."
 
-    if download_ecmwf:
-        #download all files for today
-        ecmwf_folders = ftp_ecmwf_download.download_all_ftp(ecmwf_forecast_location,
-           'Runoff.%s*.netcdf.tar.gz' % date_string)
-    else:
-        ecmwf_folders = glob(os.path.join(ecmwf_forecast_location,
-            'Runoff.'+date_string+'*.netcdf'))
-
-    era_interim_folder = os.path.join(era_interim_data_location, 'erai_runoff_1980to2014')
+    era_interim_folder = os.path.join(era_interim_data_location, 'erai_runoff_1980to2014.tar.gz')
     if download_era_interim:
         #download historical ERA data
-        era_interim_folders = ftp_ecmwf_download.download_all_ftp(era_interim_data_location,
+        era_interim_folders = download_all_ftp(era_interim_data_location,
            'erai_runoff_1980to20*.tar.gz.tar')
-        #TODO: extract all internal tar.gz files inside extracted folder
         era_interim_folder = era_interim_folders[0]
 
     if upload_output_to_ckan and data_store_url and data_store_api_key:

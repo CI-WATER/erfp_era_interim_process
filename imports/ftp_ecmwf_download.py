@@ -2,7 +2,7 @@ import datetime
 from glob import glob
 import os
 from shutil import rmtree
-import tarfile
+from extractnested import AppropriateFolderName, ExtractNested
 
 """
 This section adapted from https://github.com/keepitsimple/pyFTPclient
@@ -154,13 +154,7 @@ def download_all_ftp(download_dir, file_match):
     all_files_downloaded = []
     for dst_filename in file_list:
         local_path = os.path.join(download_dir,dst_filename)
-        #get correct local_dir
-        if local_path.endswith('.tar.gz'):
-            local_dir = local_path[:-7]
-        elif local_path.endswith('.tar.gz.tar'):
-            local_dir = local_path[:-11]
-        else:
-            local_dir = download_dir
+        local_dir = AppropriateFolderName(local_path)
         #download and unzip file
         try:
             #download from ftp site
@@ -172,11 +166,8 @@ def download_all_ftp(download_dir, file_match):
                 print dst_filename + ' already exists. Skipping download.'
             #extract from tar.gz
             if unzip_file:
-                os.mkdir(local_dir)
                 print "Extracting: " + dst_filename
-                tar = tarfile.open(local_path)
-                tar.extractall(local_dir)
-                tar.close()
+                ExtractNested(local_path)
                 #add successfully downloaded file to list
                 all_files_downloaded.append(local_dir)
             else:
