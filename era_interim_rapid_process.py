@@ -16,6 +16,7 @@ import tarfile
 import ftp_ecmwf_download
 from sfpt_dataset_manager.dataset_manager import (ECMWFRAPIDDatasetManager,
                                                   RAPIDInputDatasetManager)
+from generate_return_periods import generate_return_periods
 
 #----------------------------------------------------------------------------------------
 # FUNCTIONS
@@ -151,7 +152,7 @@ def compute_initial_rapid_flows(prediction_files, input_directory, forecast_date
 def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_location, ecmwf_forecast_location,
                                   era_interim_data_location, condor_log_directory, main_log_directory, data_store_url,
                                   data_store_api_key, app_instance_id, sync_rapid_input_with_ckan, download_ecmwf,
-                                  download_era_interim, upload_output_to_ckan):
+                                  download_era_interim, upload_output_to_ckan, generate_return_periods_file):
     """
     This it the main process
     """
@@ -249,6 +250,15 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
     #wait for jobs to finish then upload files
     for index, job in enumerate(job_list):
         job.wait()
+
+	#generate return periods
+	if generate_return_periods_file:
+	    job_info = job_info_list[index]
+	    watershed_output_dir = job_info['master_watershed_outflow_directory']
+	    erai_output_file = job_info['outflow_file_name']
+	    return_periods_file = os.path.join(watershed_output_dir, 'return_periods.nc')
+	    generate_return_periods(erai_output_file, return_periods_file)
+
         """
         #upload file when done
         if upload_output_to_ckan and data_store_url and data_store_api_key:
@@ -348,4 +358,5 @@ if __name__ == "__main__":
         download_era_interim=False,
         download_ecmwf=False,
         upload_output_to_ckan=False,
+	generate_return_periods_file = True,
     )
