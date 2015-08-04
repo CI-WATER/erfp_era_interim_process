@@ -189,7 +189,7 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
         else:
             print directory, "incorrectly formatted. Skipping ..."
 
-    era_interim_folder = os.path.join(era_interim_data_location, 'erai_runoff_1980to2014.tar.gz')
+    era_interim_folder = os.path.join(era_interim_data_location, 'erai_runoff_1980to2014')
     if download_era_interim:
         #download historical ERA data
         era_interim_folders = download_all_ftp(era_interim_data_location,
@@ -218,6 +218,7 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
             pass
         #get basin names
         interim_folder_basename = os.path.basename(era_interim_folder)
+	print era_interim_folder, interim_folder_basename
         outflow_file_name = 'Qout_%s.nc' % interim_folder_basename
         node_rapid_outflow_file = outflow_file_name
         master_rapid_outflow_file = os.path.join(master_watershed_outflow_directory, outflow_file_name)

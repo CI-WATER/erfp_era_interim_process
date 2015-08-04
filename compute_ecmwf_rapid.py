@@ -3,7 +3,7 @@ import csv
 import datetime
 import os
 import re
-from subprocess import Popen
+from subprocess import Popen, PIPE
 import sys
 
 from erfp_era_interim_process.imports.CreateInflowFileFromERAInterimRunoff import CreateInflowFileFromERAInterimRunoff
@@ -154,8 +154,15 @@ def run_RAPID_single_watershed(watershed, subbasin, rapid_executable_location,
     #run RAPID
     print "Running RAPID for:", subbasin
     try:
-        process = Popen([local_rapid_executable], shell=True)
-        process.communicate()
+        process = Popen([local_rapid_executable], stdout=PIPE, stderr=PIPE, shell=True)
+        out, err = process.communicate()
+	if err:
+	    print err
+	    raise
+	else:
+	    print 'RAPID output:'
+	    for line in out.split('\n'):
+		print line
     except Exception:
         rapid_cleanup(local_rapid_executable, rapid_namelist_file)
         raise
