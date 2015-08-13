@@ -189,7 +189,7 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
         else:
             print directory, "incorrectly formatted. Skipping ..."
 
-    era_interim_folder = os.path.join(era_interim_data_location, 'erai_runoff_1980to2014')
+    era_interim_folder = era_interim_data_location
     if download_era_interim:
         #download historical ERA data
         era_interim_folders = download_all_ftp(era_interim_data_location,
@@ -338,12 +338,12 @@ def run_era_interim_rapid_process(rapid_executable_location, rapid_io_files_loca
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
     run_era_interim_rapid_process(
-        rapid_executable_location='/home/nfieera/work/rapid/src/rapid',
-        rapid_io_files_location='/home/nfieera/rapid-io',
-        ecmwf_forecast_location ="/home/nfieera/ecmwf",
-        era_interim_data_location="/home/nfieera/era_data",
-        condor_log_directory='/home/nfieera/condor/',
-        main_log_directory='/home/nfieera/logs/',
+        rapid_executable_location='/home/alan/work/rapid/src/rapid',
+        rapid_io_files_location='/home/alan/work/rapid-io',
+        ecmwf_forecast_location ="/home/alan/work/ecmwf",
+        era_interim_data_location="/home/alan/work/era_interim",
+        condor_log_directory='/home/alan/work/condor/',
+        main_log_directory='/home/alan/work/era_logs/',
         data_store_url='http://ciwckan.chpc.utah.edu',
         data_store_api_key='8dcc1b34-0e09-4ddc-8356-df4a24e5be87',
         app_instance_id='53ab91374b7155b0a64f0efcd706854e',
@@ -351,5 +351,5 @@ if __name__ == "__main__":
         download_era_interim=False,
         download_ecmwf=False,
         upload_output_to_ckan=False,
-	generate_return_periods_file = True,
+        generate_return_periods_file=True,
     )
