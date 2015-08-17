@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+Instructions: Create a copy of this file named execute_script.py. Customize the paths to match the directories on your system.
+"""
 from era_interim_rapid_process import run_era_interim_rapid_process
 
 run_era_interim_rapid_process(
